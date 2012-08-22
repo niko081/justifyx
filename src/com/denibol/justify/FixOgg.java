@@ -169,20 +169,22 @@ public class FixOgg {
         // size
         int sum = headersize;
         boolean limit_reached = false;
-        for (int i = 27; i < page_segments + 27; i++) {
-            if (!limit_reached) {
-                sum += (page[i] & 0xFF);
-                if (sum > pagesize) {
-                    sum -= (page[i] & 0xFF);
-                    limit_reached = true;
-                    i--;
-                }
-            } else {
-                page[i] = 0;
+        int new_page_segments = page_segments;
+        int number_of_bytes_to_move_up = 0;
+        for (int i = 27; i < page_segments + 27 && !limit_reached; i++) {
+            sum += (page[i] & 0xFF);
+            if (sum > pagesize) {
+                sum -= (page[i] & 0xFF);
+                limit_reached = true;
+                new_page_segments = i - 27;
             }
         }
-        pagesize = sum;
-        // @todo delete empty pages and move data up
+        number_of_bytes_to_move_up = page_segments - new_page_segments;
+        page[26] = (byte) (new_page_segments & 0xFF); // write new number of page segments to page header
+        // shift rest of page up, to fill the deleted entries in the header
+        System.arraycopy(page, page_segments + 27, page, new_page_segments + 27, page.length - (page_segments + 27));
+        page_segments = new_page_segments;
+        pagesize = sum-number_of_bytes_to_move_up;
         // calculate crc for changed page
         OggCRC oggCrc = new OggCRC();
         oggCrc.reset();
@@ -196,8 +198,8 @@ public class FixOgg {
         fileHandler.writeByte(page[5]);
         fileHandler.seek(pageStart + 22);
         fileHandler.writeInt(swap(oggCrc.getValue())); // little endian to big endian
-        fileHandler.seek(pageStart + 27);
-        for (int i = 27; i < page_segments + 27; i++) {
+        fileHandler.seek(pageStart + 26);
+        for (int i = 26; i < pagesize; i++) {
             fileHandler.writeByte(page[i] & 0xFF);
         }
         fileHandler.close();
