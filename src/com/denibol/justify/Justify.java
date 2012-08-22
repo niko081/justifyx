@@ -63,6 +63,7 @@ import de.felixbruns.jotify.player.SpotifyInputStream;
 import adamb.vorbis.CommentField;
 import adamb.vorbis.VorbisCommentHeader;
 import adamb.vorbis.VorbisIO;
+import java.util.Arrays;
 
 public class Justify extends JotifyConnection{
 	private static Pattern REGEX = Pattern.compile(":(.*?):");
@@ -271,7 +272,7 @@ public class Justify extends JotifyConnection{
 		writer.dispose();
 		System.out.println("[100%] Album cover  <-  OK!");
 	}
-
+	
 	private void downloadTrack(Justify justify, Track track, String parent, String bitrate, String option, Integer index) throws JustifyException, TimeoutException{	
 
 		// Downloading an album, if the new track number is lower than the previous downloaded song, it means we are in a new disc
@@ -434,11 +435,12 @@ public class Justify extends JotifyConnection{
 		
 		sis.close();
 		fos.close();
+		FixOgg.fixOgg(file.getAbsolutePath());
 	}
 
 	public static boolean isWindows(){
 		String os = System.getProperty("os.name").toLowerCase();
-		return (os.indexOf( "win" ) >= 0); 
+		return (os.contains("win"));
 	}
 
 	public static String sanearNombre(String nombre){

@@ -616,7 +616,7 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 	/**
 	 * Seeks to the offset {@code off} in this stream. 
 	 * 
-	 * @param p The offset to seek to in bytes.
+	 * @param off The offset to seek to in bytes.
 	 * 
 	 * @throws IOException If the seek offset is invalid or the stream is closed.
 	 */
@@ -680,7 +680,8 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 		
 		/* Get stream length. */
 		if(header[0] == 0x03){
-			this.streamLength = IntegerUtilities.bytesToInteger(header, 1) << 2;
+			//this.streamLength = IntegerUtilities.bytesToInteger(header, 1) << 2;
+			this.streamLength = (IntegerUtilities.bytesToInteger(header, 1) << 2)/1024*1024;
 		}
 	}
 	
@@ -689,7 +690,8 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 		int off, w, x, y, z;
 		
 		/* Allocate space for ciphertext. */
-		byte[] ciphertext = new byte[data.length];
+		//byte[] ciphertext = new byte[data.length];
+		byte[] ciphertext = new byte[data.length/1024*1024];
 		
 		/* Deinterleave 4x256 byte blocks. */
 		for(int block = 0; block < data.length / 1024; block++){
@@ -707,12 +709,22 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 			}
 		}
 		
-		/* Decrypt data. */
-		byte[] plaintext = this.cipher.update(ciphertext);
+		/*
+		if (data.length != 4096) {
+			for (off = data.length / 1024 * 1024; off<data.length; off++) {
+				ciphertext[off]=data[off];
+			}
+		}
+		*/
 		
-		/* Put decrypted data into sparse buffer. */
-		this.chunks.put(this.chunkIndex++, plaintext);
 		
+		if (ciphertext.length>0) {
+			/* Decrypt data. */
+			byte[] plaintext = this.cipher.update(ciphertext);
+		
+			/* Put decrypted data into sparse buffer. */
+			this.chunks.put(this.chunkIndex++, plaintext);
+		}
 		/* Signal data arrival. */
 		this.requestLock.lock();
 		this.requestCondition.signal();
