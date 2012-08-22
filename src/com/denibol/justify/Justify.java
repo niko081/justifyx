@@ -230,7 +230,7 @@ public class Justify extends JotifyConnection{
 		}
 	}
 	
-    public void doMain(String[] args) throws IOException {
+    public void doMain(String[] args) {
         CmdLineParser parser = new CmdLineParser(this);
         
         parser.setUsageWidth(120);
@@ -251,7 +251,6 @@ public class Justify extends JotifyConnection{
             // print option sample. This is useful some time
             System.err.println("Example: java -jar justifyx.jar"+ parser.printExample(REQUIRED) + " -download <spotifyURI>");
 
-            return;
         }
     }
     
@@ -321,18 +320,18 @@ public class Justify extends JotifyConnection{
             Integer talternative = 0;
             
             if(track.getRestrictions().get(0).getForbidden() != null)
-                    if(track.getRestrictions().get(0).getForbidden().contains(country) == true)
+                    if(track.getRestrictions().get(0).getForbidden().contains(country))
                             allowed = false;
                                     
             if(track.getRestrictions().get(0).getAllowed() != null)
-                    if (track.getRestrictions().get(0).getAllowed().contains(country) == false)
+                    if (!track.getRestrictions().get(0).getAllowed().contains(country))
                             allowed = false;
             
-            if (allowed == false) {
+            if (!allowed) {
                     for(Track pista : track.getAlternatives()) {
                             nalternative++;
                             if(pista.getRestrictions().get(0).getForbidden() != null)
-                                    if(pista.getRestrictions().get(0).getForbidden().contains(country) == true)
+                                    if(pista.getRestrictions().get(0).getForbidden().contains(country))
                                             allowed = false;
                                     else {
                                     	allowed = true;
@@ -340,7 +339,7 @@ public class Justify extends JotifyConnection{
                                     }
                             
                             if(pista.getRestrictions().get(0).getAllowed() != null)
-                                    if (pista.getRestrictions().get(0).getAllowed().contains(country) == true) {
+                                    if (pista.getRestrictions().get(0).getAllowed().contains(country)) {
                                             allowed = true;
                                             talternative = nalternative;
                                     }
