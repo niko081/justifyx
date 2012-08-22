@@ -1,0 +1,41 @@
+Justify extended
+
+fork of http://code.google.com/p/justifyx/, contains my bugfixes
+
+Downloads songs from Spotify (no recompression). Needs a premium account.
+Command line:
+
+java -jar justifyx.jar [options...]
+ -chunksize <bytes>           : Fixed chunk size (default: 4096 bytes)
+ -codec <format>              : Specify codec and bitrate of the download. Options:
+                                    ogg_96: Ogg Vorbis @ 96kbps
+                                    ogg_160: Ogg Vorbis @ 160kbps
+                                    ogg_320: Ogg Vorbis @ 320kbps (default)
+ -cover <spotifyURI>          : Downloads album cover
+ -download <spotifyURI>       : Downloads track/list/album
+ -number <song_number>        : Downloads starting on the specified track number. Requires -download
+ -oggcover <method>           : Method to embed cover in ogg file when downloading tracks and playlists (not albums).
+                                Options:
+                                    new: new method (METADATA_BLOCK_PICTURE)
+                                    old: old method (default, COVERART and COVERARTMIME)
+                                    none: not embed cover in ogg
+ -password <spotify_password> : Spotify user password (required)
+ -substreamsize <bytes>       : Fixed substream size (default: 30seconds of 320kbps audio data (320 * 1024 * 30 / 8) =
+                                1228800 bytes)
+ -timeout <seconds>           : Number of seconds before throwing a timeout (default: 20 seconds)
+ -toplist <type>              : Downloads toplist tracks. Options:
+                                    track: tracks toplist
+ -toplist-region <region>     : Specify region of toplist to download.
+                                Not specified: default region of the user.
+                                    region (2 letters): a specified region.
+                                    ALL: all regions toplist
+ -user <spotify_user>         : Spotify Premium username (required)
+
+
+Examples:
+
+java -jar justifyx.jar -user spotifyuser -password spotifypassword -download spotifyURI
+
+java -jar justifyx.jar -user spotifyuser -password spotifypassword -codec ogg_96 -toplist track -toplist-region ALL
+Note: if you login using Facebook account, get your username and password in https://www.spotify.com/int/account/set-device-password/
+
