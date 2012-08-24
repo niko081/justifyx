@@ -173,4 +173,13 @@ public class SpotifyOggHeader {
 		/* Return decoded header. */
 		return decoded;
 	}
+
+	@Override
+	public String toString() {
+		return "samples: " + Integer.toString(samples) +
+				"\n length: "+Integer.toString(getLength(44100)) + " ms " +
+				Integer.toString(length) + " bytes"  +
+				"\n gainScale: " + Float.toString(gainScale) + 
+				" gainDb: " + Float.toString(gainDb);
+	}
 }
