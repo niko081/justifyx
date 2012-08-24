@@ -63,6 +63,7 @@ import de.felixbruns.jotify.player.SpotifyInputStream;
 import adamb.vorbis.CommentField;
 import adamb.vorbis.VorbisCommentHeader;
 import adamb.vorbis.VorbisIO;
+import de.felixbruns.jotify.player.SpotifyOggHeader;
 import java.util.Arrays;
 
 public class Justify extends JotifyConnection{
@@ -424,6 +425,8 @@ public class Justify extends JotifyConnection{
 		int counter = 0;
 		byte[] buf = new byte[8192];
 		sis.read(buf, 0, 167); // Skip Spotify OGG Header
+		//SpotifyOggHeader spotifyOggHeader = SpotifyOggHeader.decode(buf);
+		//System.out.println(spotifyOggHeader);
 
 		while (true) {
 			counter++;
@@ -438,8 +441,8 @@ public class Justify extends JotifyConnection{
 		
 		sis.close();
 		fos.close();
-		if (!clean)
-            FixOgg.fixOgg(file.getAbsolutePath());
+		//if (!clean)
+        //    FixOgg.fixOgg(file.getAbsolutePath());
 	}
 
 	public static boolean isWindows(){
