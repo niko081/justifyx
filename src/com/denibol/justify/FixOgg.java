@@ -126,7 +126,7 @@ public class FixOgg {
         }
         int headersize = page_segments + 27;
         int pagesize = sum + headersize;
-        boolean debug = false;
+        boolean debug = true;
         if (debug) {
             System.out.println("page size: " + String.valueOf(pagesize));
             System.out.println("header size: " + String.valueOf(headersize));

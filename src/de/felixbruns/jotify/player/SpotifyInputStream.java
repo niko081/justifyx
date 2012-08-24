@@ -39,6 +39,7 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 	 */
 	private int CHUNK_SIZE;
 	private int SUBSTREAM_SIZE;
+    private boolean clean = false;
 	
 	/* 
 	 * Protocol, track and file for
@@ -680,8 +681,10 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 		
 		/* Get stream length. */
 		if(header[0] == 0x03){
-			//this.streamLength = IntegerUtilities.bytesToInteger(header, 1) << 2;
-			this.streamLength = (IntegerUtilities.bytesToInteger(header, 1) << 2)/1024*1024;
+            if (clean)
+    			this.streamLength = IntegerUtilities.bytesToInteger(header, 1) << 2;
+            else
+			    this.streamLength = (IntegerUtilities.bytesToInteger(header, 1) << 2)/1024*1024;
 		}
 	}
 	
@@ -690,8 +693,11 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 		int off, w, x, y, z;
 		
 		/* Allocate space for ciphertext. */
-		//byte[] ciphertext = new byte[data.length];
-		byte[] ciphertext = new byte[data.length/1024*1024];
+        byte[] ciphertext;
+        if (clean)
+		    ciphertext = new byte[data.length];
+        else
+    		ciphertext = new byte[data.length/1024*1024];
 		
 		/* Deinterleave 4x256 byte blocks. */
 		for(int block = 0; block < data.length / 1024; block++){
@@ -709,13 +715,13 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 			}
 		}
 		
-		/*
-		if (data.length != 4096) {
-			for (off = data.length / 1024 * 1024; off<data.length; off++) {
-				ciphertext[off]=data[off];
-			}
-		}
-		*/
+		if (clean)
+		    if (data.length != 4096) {
+			    for (off = data.length / 1024 * 1024; off<data.length; off++) {
+    				ciphertext[off]=data[off];
+	    		}
+		    }
+
 		
 		
 		if (ciphertext.length>0) {
