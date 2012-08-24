@@ -108,7 +108,9 @@ public class Justify extends JotifyConnection{
 
     @Option(name="-substreamsize", metaVar ="<bytes>", usage="Fixed substream size (default: 30seconds of 320kbps audio data (320 * 1024 * 30 / 8) = 1228800 bytes)")
     private static int substreamsize = 320 * 1024 * 30 / 8;
-    
+
+    @Option(name="-c",usage="write clean stream without tags or corrections")
+    private static boolean clean = false;
     // receives other command line parameters than options
     @Argument
     private List<String> arguments = new ArrayList<String>();
@@ -237,6 +239,8 @@ public class Justify extends JotifyConnection{
 
         try {
             parser.parseArgument(args);
+            if (clean)
+                System.out.println("clean flag is set!");
         } catch( CmdLineException e ) {
             // if there's a problem in the command line,
             // you'll get this exception. this will report
@@ -358,7 +362,7 @@ public class Justify extends JotifyConnection{
             	return;
             }
 
-			try {
+			if (!clean) try {
 				VorbisCommentHeader comments = new VorbisCommentHeader();
 				
 				// Embeds cover in .ogg for tracks and playlists (not albums)
@@ -434,7 +438,8 @@ public class Justify extends JotifyConnection{
 		
 		sis.close();
 		fos.close();
-		FixOgg.fixOgg(file.getAbsolutePath());
+		if (!clean)
+            FixOgg.fixOgg(file.getAbsolutePath());
 	}
 
 	public static boolean isWindows(){
