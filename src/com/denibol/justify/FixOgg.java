@@ -109,14 +109,49 @@ public class FixOgg {
 
         return b1 << 24 | b2 << 16 | b3 << 8 | b4;
     }
-
-    public static int processHeader(byte[] page) throws ArrayIndexOutOfBoundsException {
+	
+	public static boolean checkPageCrc(byte[] page) {
+		byte[] temp = Arrays.copyOf(page, page.length);
+		page = temp;
+		int crcValue = swap((0xff & page[22]) << 24  |
+	                   (0xff & page[23]) << 16  |
+                       (0xff & page[24]) << 8   |
+                       (0xff & page[25]) << 0) ;
         // delete CRC field
         page[22] = 0;
         page[23] = 0;
         page[24] = 0;
         page[25] = 0;
-        page[5] = (byte) (page[5] | (byte) 4); // set EOS flag
+        // calculate page size
+        int page_segments = page[26] & 0xFF;
+        int sum = 0;
+        for (int i = 27; i < page_segments + 27; i++) {
+            sum += (page[i] & 0xFF);
+        }
+        int headersize = page_segments + 27;
+        int pagesize = sum + headersize;
+		//calculate crc
+        OggCRC oggCrc = new OggCRC();
+        oggCrc.reset();
+        oggCrc.update(page, 0, pagesize);
+		return (oggCrc.getValue() == crcValue);
+	};
+
+	/**
+	 * returns size of header, also sets EOS flag in the header and checks if crc is correct
+	 * @param page
+	 * @return
+	 * @throws ArrayIndexOutOfBoundsException 
+	 */
+    public static int processHeader(byte[] page) throws ArrayIndexOutOfBoundsException {
+        boolean debug = true;
+		if (debug && checkPageCrc(page))
+			System.out.println("\n crc value correct");
+        // delete CRC field
+        page[22] = 0;
+        page[23] = 0;
+        page[24] = 0;
+        page[25] = 0;
 
         // calculate page size
         int page_segments = page[26] & 0xFF;
@@ -126,7 +161,8 @@ public class FixOgg {
         }
         int headersize = page_segments + 27;
         int pagesize = sum + headersize;
-        boolean debug = true;
+		
+        page[5] = (byte) (page[5] | (byte) 4); // set EOS flag
         if (debug) {
             System.out.println("page size: " + String.valueOf(pagesize));
             System.out.println("header size: " + String.valueOf(headersize));
@@ -159,7 +195,6 @@ public class FixOgg {
             fileHandler.read(page);
             headersize = processHeader(page); // missing try / catch
         }
-
         int page_segments = page[26] & 0xFF;
         //incorrect, dirty hack
         int pagesize = page.length;
