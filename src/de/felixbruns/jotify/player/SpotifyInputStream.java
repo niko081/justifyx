@@ -39,7 +39,6 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 	 */
 	private int CHUNK_SIZE;
 	private int SUBSTREAM_SIZE;
-    private boolean clean = false;
 	
 	/* 
 	 * Protocol, track and file for
@@ -681,10 +680,7 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 		
 		/* Get stream length. */
 		if(header[0] == 0x03){
-            if (clean)
-    			this.streamLength = IntegerUtilities.bytesToInteger(header, 1) << 2;
-            else
-			    this.streamLength = (IntegerUtilities.bytesToInteger(header, 1) << 2)/1024*1024;
+    		this.streamLength = IntegerUtilities.bytesToInteger(header, 1) << 2;
 		}
 	}
 	
@@ -694,10 +690,7 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 		
 		/* Allocate space for ciphertext. */
         byte[] ciphertext;
-        if (clean)
-		    ciphertext = new byte[data.length];
-        else
-    		ciphertext = new byte[data.length/1024*1024];
+		ciphertext = new byte[data.length];
 		
 		/* Deinterleave 4x256 byte blocks. */
 		for(int block = 0; block < data.length / 1024; block++){
@@ -715,13 +708,34 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 			}
 		}
 		
-		if (clean)
-		    if (data.length != 4096) {
-			    for (off = data.length / 1024 * 1024; off<data.length; off++) {
-    				ciphertext[off]=data[off];
-	    		}
-		    }
-
+		/* We didn't know what to do with the last block before. it's usually smaller
+		 * than 1024 bytes, so the 4x256 deinterleaving scheme doesn't apply.
+		 * But as it turned out, we just have to divide this block into 4 parts of
+		 * equal size, and apply the same principle we used for the blocks
+		 * of size 1024. We verified that this method is correct by checking the
+		 * crc of the last ogg page of the file. 
+		 */
+		if (data.length % 1024 != 0) {
+			int block = (int)Math.ceil(data.length/1024);
+			off = block * 1024;
+			int lastblock_size = data.length - off;
+			int sub_block_size = lastblock_size / 4;
+			if (sub_block_size*4 != lastblock_size) {
+				System.out.println("subblock size doesn't add up: "+Integer.toString(sub_block_size*4));
+				System.out.println("last block size:" + Integer.toString(lastblock_size));
+			}
+			w	= block * 1024 + 0 * sub_block_size;
+			x	= block * 1024 + 1 * sub_block_size;
+			y	= block * 1024 + 2 * sub_block_size;
+			z	= block * 1024 + 3 * sub_block_size;
+				
+			for(int i = 0;  (block * 1024 + i) < data.length; i += 4){
+				ciphertext[off++] = data[w++];
+				ciphertext[off++] = data[x++];
+				ciphertext[off++] = data[y++];
+				ciphertext[off++] = data[z++];
+			}
+		}
 		
 		
 		if (ciphertext.length>0) {
