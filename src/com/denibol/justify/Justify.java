@@ -255,7 +255,7 @@ public class Justify extends JotifyConnection{
 
             // print option sample. This is useful some time
             System.err.println("Example: java -jar justifyx.jar"+ parser.printExample(REQUIRED) + " -download <spotifyURI>");
-
+			System.exit(-1);
         }
     }
     
