@@ -1,5 +1,6 @@
 package de.felixbruns.jotify.media;
 
+import java.awt.Image;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,6 +52,11 @@ public class Track extends Media {
 	 * The identifier for this tracks cover image (32-character string).
 	 */
 	private String cover;
+	
+	/**
+	 * The cover image
+	 */
+	private Image coverImage;
 	
 	/**
 	 * Similar tracks of this track.
@@ -301,12 +307,30 @@ public class Track extends Media {
 	}
 	
 	/**
+	 * Get the tracks cover image.
+	 * 
+	 * @return An Image Art.
+	 */
+	public Image getCoverImage(){
+		return this.coverImage;
+	}
+	
+	/**
 	 * Set the tracks cover image identifier.
 	 * 
 	 * @param cover A 32-character image identifier.
 	 */
 	public void setCover(String cover){
 		this.cover = cover;
+	}
+	
+	/**
+	 * Set the tracks cover image identifier.
+	 * 
+	 * @param cover A 32-character image identifier.
+	 */
+	public void setCoverImage(Image coverImage){
+		this.coverImage = coverImage;
 	}
 	
 	/**

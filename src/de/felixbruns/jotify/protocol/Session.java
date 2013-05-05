@@ -92,7 +92,7 @@ public class Session {
 	
 	/* Client ID and revision (Always up to date! ;-P) */
 	protected static final int CLIENT_ID       = 0x01040101; /* 0x010B0029 */
-	protected static final int CLIENT_REVISION = 0xFFFFFFFF;
+	protected static final int CLIENT_REVISION = 60600010;//0xFFFFFFFF;
 	
 	/* Constructor for a new spotify session. */
 	public Session(){
@@ -163,6 +163,10 @@ public class Session {
 		this.initialServerPacket = null;
 	}
 	
+	public String getAuthhash() {
+		return getHex(this.authHash);
+	}
+	
 	public String getUsername(){
 		return new String(this.username);
 	}
@@ -171,13 +175,12 @@ public class Session {
 		return this.rsaClientKeyPair.getPublicKey();
 	}
 	
-	public Protocol authenticate(String username, String password) throws ConnectionException, AuthenticationException {
+	public Protocol authenticate(String username, String pwdOrHash, Boolean isPassword) throws ConnectionException, AuthenticationException {
 		/* Number of authentication tries. */
 		int tries = 3;
 		
 		/* Set username and password. */
-		this.username = username.getBytes();
-		this.password = password.getBytes();
+		this.username = username.getBytes();		
 		
 		while(true){
 			/* Connect to a spotify server. */
@@ -191,6 +194,8 @@ public class Session {
 				break;
 			}
 			catch(ProtocolException e){
+				e.printStackTrace();
+				
 				if(tries-- > 0){
 					continue;
 				}
@@ -199,8 +204,14 @@ public class Session {
 			}
 		}
 		
-		/* Generate auth hash. */
-		this.generateAuthHash();
+		if (isPassword) {
+			this.password = pwdOrHash.getBytes();
+			/* Generate auth hash. */
+			this.generateAuthHash();
+		}
+		else {
+			this.authHash = hexToBytes(pwdOrHash);
+		}
 		
 		/* Compute shared key (Diffie Hellman key exchange). */
 		this.dhSharedKey = DH.computeSharedKey(
@@ -284,7 +295,34 @@ public class Session {
 		buffer.put(this.password);
 		
 		this.authHash = Hash.sha1(buffer.array());
+		//String hexString = getHex(this.authHash);
 	}
+	
+	static final String HEXES = "0123456789ABCDEF";
+	public static String getHex( byte [] raw ) {
+	    if ( raw == null ) {
+	        return null;
+	    }
+	    final StringBuilder hex = new StringBuilder( 2 * raw.length );
+	    for ( final byte b : raw ) {
+	        hex.append(HEXES.charAt((b & 0xF0) >> 4))
+	            .append(HEXES.charAt((b & 0x0F)));
+	    }
+	    return hex.toString();
+	}
+	
+	public static byte[] hexToBytes(String s) {
+	    int len = s.length();
+	    byte[] data = new byte[len / 2];
+	    for (int i = 0; i < len; i += 2) {
+	        data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+	                             + Character.digit(s.charAt(i+1), 16));
+	    }
+	    return data;
+	}
+
+
+
 	
 	private void generateAuthHmac(){
 		ByteBuffer buffer = ByteBuffer.allocate(

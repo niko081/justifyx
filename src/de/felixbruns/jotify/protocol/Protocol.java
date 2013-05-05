@@ -1,7 +1,17 @@
 package de.felixbruns.jotify.protocol;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
@@ -14,6 +24,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import de.felixbruns.jotify.crypto.DH;
 import de.felixbruns.jotify.exceptions.ConnectionException;
@@ -49,9 +64,60 @@ public class Protocol {
 	
 	/* Connect to one of the spotify servers. */
 	public void connect() throws ConnectionException {
-		/* Lookup servers via DNS SRV query. */
-		List<InetSocketAddress> servers = DNS.lookupSRV("_spotify-client._tcp.spotify.com");
+		ArrayList<String> listDNS = new ArrayList<String>();
 		
+		//GET list of DNS servers
+		try {
+			Socket socket = new Socket("apresolve.spotify.com", 80);
+			PrintWriter to_server = 
+			new PrintWriter(new OutputStreamWriter(socket.getOutputStream()));
+			  
+			//Send the GET command
+			  
+			to_server.print("GET / HTTP/1.1\r\nHost: apresolve.spotify.com\r\nUser-Agent: Spotify/80501333 (0; 0; 1)\r\n" +
+			  "Keep-Alive: 300\r\nConnection: keep-alive\r\nAccept-Encoding: gzip\r\n\r\n");
+			to_server.flush();  // Send it right now!
+			
+			//Write the result into an array
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			byte[] buffer = new byte[1024];
+			InputStream in = socket.getInputStream();
+			for (int bytesRead; (bytesRead = in.read(buffer)) != -1;) {
+			    baos.write(buffer, 0, bytesRead);
+			}
+			socket.close();
+			
+			//Decompress the array
+			String res = decompress(baos.toByteArray());
+	        
+	        //Parse JSON
+	        JSONObject jo  = new JSONObject(res);
+	        JSONArray ja = jo.getJSONArray("ap_list");
+
+            for (int i = 0; i < ja.length(); i++) {
+            	String dns = (String) ja.get(i);
+            	dns = dns.substring(0, dns.indexOf(':'));
+                listDNS.add(dns);
+            }
+		}
+		catch (Exception e) {e.printStackTrace();
+			throw new ConnectionException(e);
+		}
+
+		//Query DNS servers
+		List<InetSocketAddress> servers = new ArrayList<InetSocketAddress>();
+		for (String serverDNS : listDNS) {
+			/* Lookup servers via DNS SRV query. */
+			servers = DNS.lookupA(serverDNS);
+			if (servers.size() != 0)
+				break;
+			else
+				System.err.println("DNS lookup returned an empty result! : " + serverDNS);
+		}
+		
+		if (servers.size() == 0)
+			System.err.println("No server found from DNS queries! : ");
+
 		/* Add fallback servers if others don't work. */
 		servers.add(new InetSocketAddress("ap.spotify.com", 4070));
 		servers.add(new InetSocketAddress("ap.spotify.com", 80));
@@ -61,6 +127,7 @@ public class Protocol {
 		for(InetSocketAddress server : servers){
 			try{
 				/* Try to connect to current server with a timeout of 1 second. */
+				//System.err.println("connecting " + server);
 				this.channel = SocketChannel.open();
 				this.channel.socket().connect(server, 1000);
 				
@@ -82,6 +149,44 @@ public class Protocol {
 		// System.out.format("Connected to '%s'\n", this.server);
 	}
 	
+	private static String decompress(byte[] data) {
+        String result = null;
+        try {
+        	//remove headers
+        	boolean headersFound = false;
+            for(int i=0;i<data.length;i++){
+    			//System.err.println(data[i]);
+                if(data[i]=='\r' && data[i+1]=='\n' && data[i+2]=='\r' && data[i+3]=='\n'){
+                	int start = i+4+4;
+                	System.arraycopy(data, start, data, 0, data.length-start);
+                	headersFound = true;
+                	break;
+                }
+            }
+            
+            if (!headersFound)
+    			System.err.println("Headers not found!");
+            
+            //System.err.println("first " + data[0]);
+            
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            GZIPInputStream zipIn = new GZIPInputStream(
+                    new ByteArrayInputStream(data));
+ 
+            byte[] buffer = new byte[1024];
+            for (int bytesRead; (bytesRead = zipIn.read(buffer)) != -1;) {
+                baos.write(buffer, 0, bytesRead);
+            }
+ 
+            result = new String(baos.toByteArray(), "UTF-8");
+ 
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+ 
+        return result;
+    }
+	
 	/* Disconnect from server */
 	public void disconnect() throws ConnectionException {
 		try{
@@ -102,19 +207,19 @@ public class Protocol {
 	/* Send initial packet (key exchange). */
 	public void sendInitialPacket() throws ProtocolException {
 		ByteBuffer buffer = ByteBuffer.allocate(
-			2 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 16 + 96 + 128 + 1 + 1 + 2 + 0 + this.session.username.length + 1
+				2 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 16 + 96 + 128 + 1 + 1 + 2 + 0 + this.session.username.length + 1
 		);
 		
 		/* Append fields to buffer. */
 		buffer.putShort((short)3); /* Version 3 */
 		buffer.putShort((short)0); /* Length (update later) */
-		buffer.putInt(this.session.clientOs);
-		buffer.putInt(0x00000000); /* Unknown */
+		buffer.putInt(0x00000300); /* Unknown */
+		buffer.putInt(0x00030c00); /* Unknown */
 		buffer.putInt(this.session.clientRevision);
-		buffer.putInt(0x1541ECD0); /* Windows: 0x1541ECD0, Mac OSX: 0x00000000 */
-		buffer.putInt(0x01000000); /* Windows: 0x01000000, Mac OSX: 0x01040000 */
-		buffer.putInt(this.session.clientId); /* 4 bytes, Windows: 0x010B0029, Mac OSX: 0x026A0200 */
-		buffer.putInt(0x00000001); /* Unknown */
+		buffer.putInt(0x00000000); /* Unknown */
+		buffer.putInt(0x01000000); /* Unknown */
+		buffer.putInt(this.session.clientId); /* 4 bytes */
+		buffer.putInt(0x00000000); /* Unknown */
 		buffer.put(this.session.clientRandom); /* 16 bytes */
 		buffer.put(this.session.dhClientKeyPair.getPublicKeyBytes()); /* 96 bytes */
 		buffer.put(this.session.rsaClientKeyPair.getPublicKeyBytes()); /* 128 bytes */
@@ -123,7 +228,8 @@ public class Protocol {
 		buffer.putShort((short)0x0100); /* Unknown */
 		/* Random bytes here... */
 		buffer.put(this.session.username);
-		buffer.put((byte)0x5F);/* Minor protocol version. */
+		// buffer.put((byte)0x5F);/* Minor protocol version. */
+        buffer.put((byte)0x48); /* Unknown. Flags?: x1xx1?xx. x: 0 or 1 works, ?: sometimes 0 or 1 works - old jotify 0x5F, despotify 0x40 */
 		
 		/* Update length byte. */
 		buffer.putShort(2, (short)buffer.position());
@@ -423,7 +529,7 @@ public class Protocol {
 	}
 	
 	/* Receive a packet (will be decrypted with stream cipher). */
-	public void receivePacket() throws ProtocolException {
+	public void receivePacket() throws ProtocolException, IOException {
 		byte[] header = new byte[3];
 		int command, payloadLength, headerLength = 3, macLength = 4;
 		
@@ -451,22 +557,22 @@ public class Protocol {
 		/* Limit buffer to payload length, so we can read the payload. */
 		buffer.limit(payloadLength);
 		
-		try{
+		//try{
 			for(int n = payloadLength, r; n > 0 && (r = this.channel.read(buffer)) > 0; n -= r);
-		}
+		/*}
 		catch(IOException e){
 			throw new ProtocolException("Failed to read payload!", e);
-		}
+		}*/
 		
 		/* Extend it again to payload and mac length. */
 		buffer.limit(payloadLength + macLength);
 		
-		try{
+		//try{
 			for(int n = macLength, r; n > 0 && (r = this.channel.read(buffer)) > 0; n -= r);
-		}
+		/*}
 		catch(IOException e){
 			throw new ProtocolException("Failed to read MAC!", e);
-		}
+		}*/
 		
 		/* Decrypt payload. */
 		this.session.shannonRecv.decrypt(bytes);
@@ -752,7 +858,6 @@ public class Protocol {
 			if(id.length() != 32){
 				throw new IllegalArgumentException("Id needs to have a length of 32.");
 			}
-			
 			buffer.put(Hex.toBytes(id));
 		}
 		
@@ -760,12 +865,12 @@ public class Protocol {
 		if(type == 1 || type == 2){
 			buffer.putInt(0); /* Timestamp of cached version? */
 		}
-		
+
 		buffer.flip();
 		
 		/* Register channel. */
 		Channel.register(channel);
-		
+		//System.err.println(2 + 2 + 1 + ids.size() * 16 + ((type == 1 || type == 2)?4:0));
 		/* Send packet. */
 		this.sendPacket(Command.COMMAND_BROWSE, buffer);
 	}

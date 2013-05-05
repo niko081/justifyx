@@ -9,6 +9,9 @@ import java.util.concurrent.*;
 
 import javax.imageio.ImageIO;
 
+import com.denibol.justify.Justify;
+import com.denibol.justify.JustifyException;
+
 import de.felixbruns.jotify.crypto.*;
 import de.felixbruns.jotify.exceptions.*;
 import de.felixbruns.jotify.media.*;
@@ -92,14 +95,14 @@ public class JotifyConnection implements Jotify, CommandListener {
 	 * @throws ConnectionException
 	 * @throws AuthenticationException
 	 */
-	public void login(String username, String password) throws ConnectionException, AuthenticationException {
+	public void login(String username, String pwdOrHash, Boolean isPassword) throws ConnectionException, AuthenticationException {
 		/* Check if we're already logged in. */
 		if(this.protocol != null){
 			throw new IllegalStateException("Already logged in!");
 		}
 		
 		/* Authenticate session and get protocol. */
-		this.protocol = this.session.authenticate(username, password);
+		this.protocol = this.session.authenticate(username, pwdOrHash, isPassword);
 		
 		/* Create user object. */
 		this.user = new User(username);
@@ -149,13 +152,16 @@ public class JotifyConnection implements Jotify, CommandListener {
 					break;
 				}
 				
+				try {
 				this.protocol.receivePacket();
+				} catch (IOException e){e.printStackTrace();}
 			}
 		}
 		catch(ProtocolException e){
 			/* Connection was closed. */
+			e.printStackTrace();
 		}
-		finally{
+		finally{System.err.println("Connection closed");
 			this.running = false;
 		}
 	}
@@ -299,10 +305,11 @@ public class JotifyConnection implements Jotify, CommandListener {
 	 * 
 	 * @return An {@link XMLElement} object holding the data or null
 	 *         on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see BrowseType
 	 */
-	private Object browse(int type, String id) throws TimeoutException {
+	private Object browse(int type, String id) throws TimeoutException, ProtocolException {
 		/*
 		 * Check if id is a 32-character hex string,
 		 * if not try to parse it as a Spotify URI.
@@ -310,7 +317,6 @@ public class JotifyConnection implements Jotify, CommandListener {
 		if(id.length() != 32 && !Hex.isHex(id)){
 			try{
 				Link link = Link.create(id);
-				
 				if((type == BROWSE_ARTIST && !link.isArtistLink()) ||
 				   (type == BROWSE_ALBUM  && !link.isAlbumLink())  ||
 				   (type == BROWSE_TRACK  && !link.isTrackLink())){
@@ -333,17 +339,24 @@ public class JotifyConnection implements Jotify, CommandListener {
 		ChannelCallback callback = new ChannelCallback();
 		
 		/* Send browse request. */
-		try{
+	//	try{
 			this.protocol.sendBrowseRequest(callback, type, id);
-		}
+	/*	}
+		catch (NullPointerException e) {
+			throw new ProtocolException("Connection error");
+		}*/
+		/*
 		catch(ProtocolException e){
+			System.err.println(e.getMessage());e.printStackTrace();
 			return null;
-		}
+		}*/
 		
 		/* Create object from XML. */
-		return XMLMediaParser.parse(
-			callback.get(this.timeout, this.unit), "UTF-8"
-		);
+		byte[] data = callback.get(this.timeout, this.unit);
+		
+		if (data == null)
+			throw new TimeoutException();
+		return XMLMediaParser.parse(data, "UTF-8");
 	}
 	
 	/**
@@ -353,10 +366,11 @@ public class JotifyConnection implements Jotify, CommandListener {
 	 * 
 	 * @return An {@link Artist} object holding more information about
 	 *         the artist or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Artist
 	 */
-	public Artist browseArtist(String id) throws TimeoutException {
+	public Artist browseArtist(String id) throws TimeoutException, ProtocolException {
 		/* Browse. */
 		Object artist = this.browse(BROWSE_ARTIST, id);
 		
@@ -374,10 +388,11 @@ public class JotifyConnection implements Jotify, CommandListener {
 	 * 
 	 * @return A new {@link Artist} object holding more information about
 	 *         the artist or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Artist
 	 */
-	public Artist browse(Artist artist) throws TimeoutException {
+	public Artist browse(Artist artist) throws TimeoutException, ProtocolException {
 		return this.browseArtist(artist.getId());
 	}
 	
@@ -388,10 +403,11 @@ public class JotifyConnection implements Jotify, CommandListener {
 	 * 
 	 * @return An {@link Album} object holding more information about
 	 *         the album or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Album
 	 */
-	public Album browseAlbum(String id) throws TimeoutException {
+	public Album browseAlbum(String id) throws TimeoutException, ProtocolException {
 		/* Browse. */
 		Object album = this.browse(BROWSE_ALBUM, id);
 		
@@ -409,10 +425,11 @@ public class JotifyConnection implements Jotify, CommandListener {
 	 * 
 	 * @return A new {@link Album} object holding more information about
 	 *         the album or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Album
 	 */
-	public Album browse(Album album) throws TimeoutException {
+	public Album browse(Album album) throws TimeoutException, ProtocolException {
 		return this.browseAlbum(album.getId());
 	}
 	
@@ -422,10 +439,10 @@ public class JotifyConnection implements Jotify, CommandListener {
 	 * @param id A 32-character hex string or a Spotify URI.
 	 * 
 	 * @return A {@link Track} object or null on failure.
-	 * 
+	 * @throws ProtocolException 
 	 * @see Track
 	 */
-	public Track browseTrack(String id) throws TimeoutException {
+	public Track browseTrack(String id) throws TimeoutException, ProtocolException {
 		/* Browse. */
 		Object object = this.browse(BROWSE_TRACK, id);
 		
@@ -433,12 +450,13 @@ public class JotifyConnection implements Jotify, CommandListener {
 			Result result = (Result)object;
 			
 			if(result.getTracks().isEmpty()){
+				Justify.notifyError("Track not found");
 				return null;
 			}
-			
 			return result.getTracks().get(0);
 		}
 		
+		Justify.notifyError("Network error");
 		return null;
 	}
 	
@@ -448,10 +466,11 @@ public class JotifyConnection implements Jotify, CommandListener {
 	 * @param track A {@link Track} object identifying the track to browse.
 	 * 
 	 * @return A {@link Track} object or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Track
 	 */
-	public Track browse(Track track) throws TimeoutException {
+	public Track browse(Track track) throws TimeoutException, ProtocolException {
 		return this.browseTrack(track.getId());
 	}
 	

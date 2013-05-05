@@ -6,6 +6,7 @@ import java.util.concurrent.TimeoutException;
 
 import de.felixbruns.jotify.exceptions.AuthenticationException;
 import de.felixbruns.jotify.exceptions.ConnectionException;
+import de.felixbruns.jotify.exceptions.ProtocolException;
 import de.felixbruns.jotify.media.Album;
 import de.felixbruns.jotify.media.Artist;
 import de.felixbruns.jotify.media.Playlist;
@@ -24,7 +25,7 @@ public interface Jotify extends Runnable {
 	 * @throws ConnectionException
 	 * @throws AuthenticationException
 	 */
-	public void login(String username, String password) throws ConnectionException, AuthenticationException;
+	public void login(String username, String pwdOrHash, Boolean isPassword) throws ConnectionException, AuthenticationException;
 	
 	/**
 	 *  Closes the connection to a Spotify server.
@@ -88,10 +89,11 @@ public interface Jotify extends Runnable {
 	 * 
 	 * @return A new {@link Artist} object holding more information about
 	 *         the artist or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Artist
 	 */
-	public Artist browse(Artist artist) throws TimeoutException;
+	public Artist browse(Artist artist) throws TimeoutException, ProtocolException;
 	
 	/**
 	 * Browse album info.
@@ -100,10 +102,11 @@ public interface Jotify extends Runnable {
 	 * 
 	 * @return A new {@link Album} object holding more information about
 	 *         the album or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Album
 	 */
-	public Album browse(Album album) throws TimeoutException;
+	public Album browse(Album album) throws TimeoutException, ProtocolException;
 	
 	/**
 	 * Browse track info.
@@ -111,10 +114,11 @@ public interface Jotify extends Runnable {
 	 * @param track A {@link Track} object identifying the track to browse.
 	 * 
 	 * @return A {@link Track} object or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Track
 	 */
-	public Track browse(Track track) throws TimeoutException;
+	public Track browse(Track track) throws TimeoutException, ProtocolException;
 	
 	/**
 	 * Browse information for multiple tracks.
@@ -135,10 +139,11 @@ public interface Jotify extends Runnable {
 	 * 
 	 * @return An {@link Artist} object holding more information about
 	 *         the artist or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Artist
 	 */
-	public Artist browseArtist(String id) throws TimeoutException;
+	public Artist browseArtist(String id) throws TimeoutException, ProtocolException;
 	
 	/**
 	 * Browse album info by id.
@@ -147,10 +152,11 @@ public interface Jotify extends Runnable {
 	 * 
 	 * @return An {@link Album} object holding more information about
 	 *         the album or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Album
 	 */
-	public Album browseAlbum(String id) throws TimeoutException;
+	public Album browseAlbum(String id) throws TimeoutException, ProtocolException;
 	
 	/**
 	 * Browse track info by id.
@@ -158,10 +164,11 @@ public interface Jotify extends Runnable {
 	 * @param id An id identifying the track to browse.
 	 * 
 	 * @return A {@link Track} object or null on failure.
+	 * @throws ProtocolException 
 	 * 
 	 * @see Track
 	 */
-	public Track browseTrack(String id) throws TimeoutException;
+	public Track browseTrack(String id) throws TimeoutException, ProtocolException;
 	
 	/**
 	 * Browse information for multiple tracks by id.

@@ -87,6 +87,7 @@ public class Channel {
 		offset += 2;
 		length -= 2;
 		
+		
 		if(channel.state.equals(State.STATE_HEADER)){
 			if(length < 2){
 				System.err.println("Length is smaller than 2!");

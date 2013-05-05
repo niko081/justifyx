@@ -62,11 +62,16 @@ import de.felixbruns.jotify.player.SpotifyInputStream;
 import adamb.vorbis.CommentField;
 import adamb.vorbis.VorbisCommentHeader;
 import adamb.vorbis.VorbisIO;
+import de.felixbruns.jotify.exceptions.ProtocolException;
 import de.felixbruns.jotify.player.SpotifyOggHeader;
 import java.util.Arrays;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class Justify extends JotifyConnection {
 
+	private long bytesDl = 0;
+	private long bytesTotal = 0;
 	private static Pattern REGEX = Pattern.compile(":(.*?):");
 	private static String ALBUM_FORMAT = ":artist.name: - :name:";
 	private static String PLAYLIST_FORMAT = ":author: - :name:";
@@ -77,6 +82,8 @@ public class Justify extends JotifyConnection {
 	private static String user;
 	@Option(name = "-password", metaVar = "<spotify_password>", usage = "Spotify user password (required)", required = true)
 	private static String password;
+	@Option(name = "-hash", metaVar = "<spotify_hash>", usage = "Spotify auth hash", required = false)
+	private static String authHash;
 	@Option(name = "-cover", metaVar = "<spotifyURI>", usage = "Downloads album cover")
 	private static String coverURI;
 	@Option(name = "-download", metaVar = "<spotifyURI>", usage = "Downloads track/list/album")
@@ -103,7 +110,57 @@ public class Justify extends JotifyConnection {
 	@Argument
 	private List<String> arguments = new ArrayList<String>();
 
-	public static void main(String args[]) throws IOException, InterruptedException {
+	public static void notify(String msg, long caller) {
+		System.out.println(msg);
+	}
+
+	public static void notifyError(String msg, long caller) {
+		System.err.println(msg);
+	}
+
+	public static void notify(String msg) {
+		notify(msg, 0);
+	}
+
+	public static void notifyError(String msg) {
+		notifyError(msg, 0);
+	}
+
+	public static void notifySilent(String msg) {
+		System.out.println(msg);
+	}
+
+	public static void log(String msg) {
+		System.out.println(msg);
+	}
+
+	public static void logError(String msg) {
+		System.err.println(msg);
+	}
+
+	public String getAuthHash() {
+		return this.session.getAuthhash();
+	}
+
+	public void loginInit() throws ConnectionException, AuthenticationException,
+			JustifyException, TimeoutException {
+		if (password == null) {
+			login(user, authHash, false);
+		} else {
+			login(user, password, true);
+		}
+
+		User usuario = user();
+		country = usuario.getCountry();
+
+		if (!usuario.isPremium()) {
+			throw new JustifyException("Sorry, you must be a Premium user");
+		} else {
+			System.out.println("Connection OK");
+		}
+	}
+
+	public static void main(String args[]) throws IOException, InterruptedException, ProtocolException {
 
 		new Justify().doMain(args);
 
@@ -115,22 +172,23 @@ public class Justify extends JotifyConnection {
 
 		Justify justify = new Justify();
 		try {
-
 			try {
-				justify.login(user, password);
-			} catch (ConnectionException ce) {
-				throw new JustifyException("[ERROR] Error connecting the server");
-			} catch (AuthenticationException ae) {
-				throw new JustifyException("[ERROR] User or password is not valid");
+				justify.loginInit();
+			} catch (ConnectionException e) {
+				notifyError("Error connecting to the server");
+				e.printStackTrace();
+				//connection error also end up there
+			} catch (AuthenticationException e) {
+				notifyError(e.getMessage());
+				e.printStackTrace();
+			} catch (TimeoutException e) {
+				notifyError("Timeout");
+				e.printStackTrace();
+			} catch (JustifyException e) {
+				notifyError(e.getMessage());
+				e.printStackTrace();
 			}
 
-			User usuario = justify.user();
-			country = usuario.getCountry();
-			System.out.println(usuario);
-			System.out.println();
-			if (!usuario.isPremium()) {
-				throw new JustifyException("[ERROR] You must be a 'premium' user");
-			}
 
 			if (toplist_region == null) {
 				toplist_region = country;
@@ -288,7 +346,8 @@ public class Justify extends JotifyConnection {
 		System.out.println("[100%] Album cover  <-  OK!");
 	}
 
-	private void downloadTrack(Justify justify, Track track, String parent, String bitrate, String option, Integer index) throws JustifyException, TimeoutException {
+	
+	private void downloadTrack(Justify justify, Track track, String parent, String bitrate, String option, Integer index) throws JustifyException, TimeoutException, ProtocolException {
 
 		// Downloading an album, if the new track number is lower than the previous downloaded song, it means we are in a new disc
 		if (option.equals("album")) {
@@ -449,36 +508,56 @@ public class Justify extends JotifyConnection {
 		}
 	}
 
-	private void download(Track track, java.io.File file, String bitrate) throws TimeoutException, IOException {
+	private void download(Track track, java.io.File file, String bitrate) throws TimeoutException, IOException, JustifyException {
 		if (track.getFiles().size() == 0) {
 			return;
 		}
 		FileOutputStream fos = new FileOutputStream(file);
 		SpotifyInputStream sis = new SpotifyInputStream(protocol, track, bitrate, chunksize, substreamsize);
 
-		System.out.print(".");
+		Timer timer = new Timer();	
 
-		int counter = 0;
-		byte[] buf = new byte[8192];
-		sis.read(buf, 0, 167); // Skip Spotify OGG Header
-		//SpotifyOggHeader spotifyOggHeader = SpotifyOggHeader.decode(buf);
-		//System.out.println(spotifyOggHeader);
+		try {
+			byte[] buf = new byte[8192];
+			sis.read(buf, 0, 167); // Skip Spotify OGG Header
+			
+			bytesDl = 0;
+			bytesTotal = (320 * (track.getLength() / 1000) * 1024) / 8;
+			
+			timer.scheduleAtFixedRate(new TimerTask() {
+			        public void run() {
+			        	notifySilent(String.valueOf(bytesDl) + " " + String.valueOf(bytesTotal));
+			        }
+			    }, 1000, 1000);
+			
+			while (true) {
+				int length = 0;
 
-		while (true) {
-			counter++;
-			int length = sis.read(buf);
-			if (length < 0) {
-				break;
-			}
-			fos.write(buf, 0, length);
-			if (counter == 256) {
-				counter = 0;
-				System.out.print(".");
+				if (isStopped() == true) {
+					sis.close();
+					break;
+				}
+				else {
+					length = sis.read(buf);
+					if (length < 0)
+						break;
+				}
+				
+				fos.write(buf, 0, length);
+				bytesDl += length;
 			}
 		}
-
-		sis.close();
-		fos.close();
+		catch(IOException e){e.printStackTrace();
+			throw new JustifyException(e.getMessage());
+		}
+		finally {
+			fos.close();
+			//catch timer not started
+			try {
+			timer.cancel();
+			} catch (IllegalStateException e) {}
+			sis.close();
+		}
 		//if (!clean)
 		//    FixOgg.fixOgg(file.getAbsolutePath());
 	}
@@ -529,8 +608,13 @@ public class Justify extends JotifyConnection {
 			}
 			regexMatcher.appendTail(resultString);
 		} catch (Exception e) {
-			throw new JustifyException(e);
+			// throw new JustifyException(e);
+			notifyError(e.toString());
 		}
 		return resultString.toString();
+	}
+
+	private static boolean isStopped() {
+		return false;
 	}
 }

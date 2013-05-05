@@ -45,7 +45,7 @@ public class XMLMediaParser extends XMLParser implements XMLStreamConstants {
 	 */
 	private Object parse() throws XMLStreamException, XMLParserException {
 		String name;
-		
+
 		/* Check if reader is currently on a start element. */
 		if(this.reader.getEventType() == START_ELEMENT){
 			name = this.reader.getLocalName();
@@ -963,17 +963,18 @@ public class XMLMediaParser extends XMLParser implements XMLStreamConstants {
 	public static Object parse(byte[] xml, String encoding){
 		try{
 			XMLMediaParser parser = new XMLMediaParser(new ByteArrayInputStream(xml, 0, xml.length - 1), encoding);
-			
 			return parser.parse();
 		}
 		catch(XMLStreamException e){
 			e.printStackTrace();
-			
 			return null;
 		}
 		catch(XMLParserException e){
 			e.printStackTrace();
-			
+			return null;
+		}
+		catch(NullPointerException e){
+			e.printStackTrace();
 			return null;
 		}
 	}

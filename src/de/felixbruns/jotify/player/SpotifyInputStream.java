@@ -186,7 +186,7 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 				}
 			}
 		}
-			
+		
 		/* Create SecretKeySpec from AES key bytes and set initial IV. */		
 		boolean doneaes = false;
 		done=false;
@@ -217,7 +217,7 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 					if(key != null)
 						done=true;
 					else
-						System.out.println("TIMEOUT AES KEY");
+						System.err.println("TIMEOUT AES KEY");
 				}
 				done=false;
 			}
@@ -406,7 +406,17 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 			}
 			
 			/* Wait until a chunk arrived. (TODO: Timeout, then throw IOException!?) */
-			this.requestCondition.awaitUninterruptibly();
+			//this.requestCondition.awaitUninterruptibly();
+			try {
+				if (!this.requestCondition.await(20000, TimeUnit.MILLISECONDS)) {
+					this.requestLock.unlock();
+					throw new IOException("Timeout");
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				this.requestLock.unlock();
+				return -1;
+			}
 		}
 		
 		/* Release request lock again. */
@@ -502,8 +512,18 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 				break;
 			}
 			
-			/* Wait until a chunk arrived. (TODO: Timeout, then throw IOException!?) */
-			this.requestCondition.awaitUninterruptibly();
+			/* Wait until a chunk arrived.*/
+			//this.requestCondition.awaitUninterruptibly();
+			try {
+				if (!this.requestCondition.await(20000, TimeUnit.MILLISECONDS)) {
+					this.requestLock.unlock();
+					throw new IOException("Timeout");
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				this.requestLock.unlock();
+				return -1;
+			}
 		}
 		
 		/* Release request lock again. */
@@ -613,7 +633,7 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 		this.readPosition = this.markPosition;
 	}
 	
-	/**
+		/**
 	 * Seeks to the offset {@code off} in this stream. 
 	 * 
 	 * @param off The offset to seek to in bytes.
@@ -685,9 +705,12 @@ public class SpotifyInputStream extends InputStream implements ChannelListener {
 	}
 	
 	public void channelData(Channel channel, byte[] data){
+		//Check the stream is not closed
+		if (this.isClosed)
+			return;
+		
 		/* Offsets needed for deinterleaving. */
 		int off, w, x, y, z;
-		
 		/* Allocate space for ciphertext. */
         byte[] ciphertext;
 		ciphertext = new byte[data.length];

@@ -18,6 +18,7 @@ public class ChannelAudioHandler implements ChannelListener {
 	private Cipher       cipher;
 	private Key          key;
 	private byte[]       iv;
+	@SuppressWarnings("unused")
 	private int          offset;
 	private OutputStream output;
 	

@@ -21,9 +21,9 @@ public class JustifyException extends Exception{
 
 	private static final long serialVersionUID = 4277008991210124116L;
 	
-	public JustifyException(String message){ super(message); }
-	public JustifyException(Throwable cause){ super(cause); }
-	public JustifyException(String message, Throwable cause){ super(message, cause); }
+	public JustifyException(String message){super(message);}
+	/*
+	public JustifyException(Throwable cause){Justify.notifyError(cause.getMessage());/*super(cause); *//*}
+	public JustifyException(String message, Throwable cause){Justify.notifyError(message);/*this.printStackTrace();*/ /*super(message, cause);*//*}*/
 
 }
-
