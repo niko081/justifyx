@@ -265,9 +265,29 @@ public class XMLPlaylistParser extends XMLParser implements XMLStreamConstants {
 						}
 						else if(object instanceof PlaylistContainer){
 							List<Playlist> playlists = new ArrayList<Playlist>();
-							
-							while(tokenizer.hasMoreTokens()){
-								playlists.add(new Playlist(tokenizer.nextToken().substring(0, 32)));
+
+                            String lastFolder = "";
+
+                            while (tokenizer.hasMoreTokens())
+                            {
+                                String str = tokenizer.nextToken();
+                                String[] tokens = str.split(":");
+                                if (tokens.length >= 3 && tokens[0].equals("spotify"))
+                                {
+                                    if (tokens.length >= 4 && tokens[1].equals("start-group"))
+                                    {
+                                        System.out.println("* Start playlist folder: " + tokens[3]);
+                                        lastFolder = tokens[3];
+                                    }
+                                    else if (tokens[1].equals("end-group"))
+                                    {
+                                        System.out.println("* End playlist folder: " + lastFolder);
+                                    }
+                                }
+                                else
+                                {
+								    playlists.add(new Playlist(str.substring(0, 32)));
+                                }
 							}
 							
 							((PlaylistContainer)object).setPlaylists(playlists);
